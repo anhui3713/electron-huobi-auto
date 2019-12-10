@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Hello World!</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    .app {
+      display: flex;
+      height: 100%;
+    }
+    .left-bar {
+      width: 15%;
+    }
+    .right-bar {
+      width: 85%;
+    }
+    #webview, #loginpanel {
+      width: 100%;
+      height: 100%;
+    }
+    #loginpanel {
+      padding-top: 200px;
+      text-align: center;
+    }
+    #loginpanel .form-feild {
+      margin-top: 15px;
+    }
+    #formMsg {
+      color: #ff5353;
+    }
+    #submitButton {
+      padding: 5px 15px;
+    }
+    body.inputed #loginpanel {
+      display: none;
+    }
+    /* #webview {
+      display: none;
+    } */
+    /* #webview:host {
+      height: 100%;
+    }
+    body.inputed #webview {
+      display: block;
+    } */
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="left-bar">
+      <ul>
+        <li>zhangsan1</li>
+        <li>zhangsan2</li>
+        <li>zhangsan3</li>
+        <li>zhangsan4</li>
+      </ul>
+      <div id="msgPanel">
+        <div>页面初始化完成...</div>
+      </div>
+    </div>
+    <div class="right-bar">
+      <!-- <webview
+        id="webview"
+        src="https://c2c.huobi.co/zh-cn/login/?backUrl=%2Fzh-cn%2Fone-trade%2F%23total%3D1000%26currency%3Dusdt%26utm_source%3Dhuobi-web-okb"
+      ></webview> -->
+      <div id="loginpanel">
+        <div class="form-feild">
+          <label>账号:</label>
+          <input type="text" name="username" placeholder="请输入账号" value="hankdotdot@gmail.com">
+        </div>
+        <div class="form-feild">
+          <label>密码:</label>
+          <input type="text" name="password" placeholder="请输入密码" value="aa123123">
+        </div>
+        <!-- <div class="form-feild">
+          <label>充值货币类型:</label>
+          <select name="currency">
+            <option value="BTC">BTC</option>
+            <option value="ETH" selected>ETH</option>
+            <option value="USDT">USDT</option>
+            <option value="EOS">EOS</option>
+          </select>
+        </div> -->
+        <div class="form-feild">
+          <label>充值金额:</label>
+          <input type="text" name="amount" placeholder="请输入金额" value="1000">
+        </div>
+        <div class="form-feild">
+          <label>充值方式:</label>
+          <select name="paytype">
+            <option value="0">支付宝</option>
+            <option value="1">银行卡</option>
+            <option value="2" selected>微信</option>
+          </select>
+        </div>
+        <div id="formMsg"></div>
+        <div class="form-feild">
+          <button id="submitButton">提交</button>
+        </div>
+      </div>
+      <!-- src="https://www.hbg.com/zh-cn/login/?backUrl=%2Fzh-cn%2F" -->
+      <webview id="webview"></webview>
+    </div>
+  </div>
+  <script>
+    const ipcRenderer = require('electron').ipcRenderer
+
+    onload = () => {
+      const $ = document.querySelector.bind(document)
+      const webview = document.querySelector('#webview')
+      const webcontent = webview.getWebContents()
+      const msgPanel = $('#msgPanel')
+      const submitButton = $('#submitButton')
+      const formMsg = $('#formMsg')
+      let paytype = 0;
+
+      function addMessage(msg) {
+        const msgEl = document.createElement('div')
+        msgEl.innerHTML = msg
+        msgPanel.appendChild(msgEl)
+      }
+
+      ipcRenderer.on('net-message', (evt, msg) => {
+        console.log(msg)
+      })
+      // ipcRenderer.on('http-net-message', (evt, msg) => {
+      //   console.log(evt, msg)
+      // })
+
+      submitButton.addEventListener('click', () => {
+        const username = $('[name="username"]').value
+        const password = $('[name="password"]').value
+        // const currency = $('[name="currency"]').value
+        const amount = $('[name="amount"]').value
+        paytype = +$('[name="paytype"]').value
+
+        if (!username) {
+          formMsg.innerHTML = '请输入账号'
+          return
+        }
+        if (!password) {
+          formMsg.innerHTML = '请输入密码'
+          return
+        }
+        if (!+amount) {
+          formMsg.innerHTML = '请输入正确的金额'
+          return
+        }
+
+        const params = {
+          total: amount,
+          currency: 'USDT',
+          utm_source: 'huobi-web-okb'
+        };
+
+        const backUrl = encodeURIComponent(`/zh-cn/one-trade/#${Object.entries(params).map(([k, v]) => `${k}=${v}`).join('&')}`)
+
+        try {
+          addMessage('准备加载目标地址...')
+          // webview.loadURL('https://www.hbg.com/zh-cn/login/?backUrl=%2Fzh-cn%2F')
+          webview.loadURL(`https://c2c.huobi.co/zh-cn/login/?backUrl=${backUrl}`)
+          addMessage('加载目标地址中...')
+          document.body.className = 'inputed'
+        } catch (e) {
+          addMessage('加载遇到问题:', JSON.stringify(e))
+        }
+      })
+
+      webview.addEventListener('dom-ready', (e) => {
+        // webview.openDevTools()
+        addMessage('webview 加载完成...')
+      })
+      webcontent.on('did-finish-load', (e) => {
+        addMessage('webcontent 加载完成...')
+        setTimeout(() => {
+          const username = $('[name="username"]').value
+          const password = $('[name="password"]').value
+          webcontent.executeJavaScript(`
+            const loginNameInput = document.querySelector('[type="text"]')
+            loginNameInput.value = '${username}'
+            const levt = new Event('input', { bubbles: true })
+            levt.simulated = true
+            loginNameInput.dispatchEvent(levt)
+
+            const passwordInput = document.querySelector('[type="password"]')
+            passwordInput.value = '${password}'
+            const pevt = new Event('input', { bubbles: true })
+            pevt.simulated = true
+            passwordInput.dispatchEvent(pevt)
+
+            const submitButton = document.querySelector('button')
+            const sevt = new Event('click', { bubbles: true })
+            sevt.simulated = true
+            submitButton.dispatchEvent(sevt)
+          `)
+          
+          // setTimeout(() => {
+          //   webcontent.executeJavaScript(`
+          //     const pevt = new Event('click', { bubbles: true })
+          //     pevt.simulated = true
+          //     document.querySelector('.paymethods-container .paymethods-inner')[${paytype}].dispatchEvent(pevt)
+          //   `)
+          // }, 8000)
+          ipcRenderer.once('risk-completed', () => {
+            console.log('risk-completed')
+            webcontent.executeJavaScript(`
+              const submitButton = document.querySelector('button')
+              const sevt = new Event('click', { bubbles: true })
+              sevt.simulated = true
+              submitButton.dispatchEvent(sevt)
+            `)
+            setTimeout(() => {
+              webcontent.executeJavaScript(`
+                const pevt = new Event('click', { bubbles: true })
+                pevt.simulated = true
+                document.querySelector('.paymethods-container .paymethods-inner')[${paytype}].dispatchEvent(pevt)
+              `)
+            }, 15000)
+            // ipcRenderer.once('cstm-completed', () => {
+            //   console.log('cstm-completed')
+            //   webcontent.executeJavaScript(`
+            //     const pevt = new Event('click', { bubbles: true })
+            //     pevt.simulated = true
+            //     document.querySelector('.paymethods-container .paymethods-inner')[${paytype}].dispatchEvent(pevt)
+            //   `)
+            // })
+          })
+        }, 100)
+        // setTimeout(() => {
+        //   webcontent.executeJavaScript(`
+        //     const loginNameInput = document.querySelector('#login_name')
+        //     loginNameInput.value = 'hankdotdot@gmail.com'
+        //     const levt = new Event('input', { bubbles: true })
+        //     levt.simulated = true
+        //     loginNameInput.dispatchEvent(levt)
+            
+        //     const passwordInput = document.querySelector('#password')
+        //     passwordInput.value = 'aa123123'
+        //     const pevt = new Event('input', { bubbles: true })
+        //     pevt.simulated = true
+        //     passwordInput.dispatchEvent(pevt)
+
+        //     const submitButton = document.querySelector('.login-btn-submit')
+        //     const sevt = new Event('click', { bubbles: true })
+        //     sevt.simulated = true
+        //     submitButton.dispatchEvent(sevt)
+        //   `)
+        // }, 100)
+      })
+    }
+  </script>
+</body>
+</html>
